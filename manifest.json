@@ -1,0 +1,20 @@
+{
+  "name": "Météo Émotionnelle",
+  "short_name": "MétéoÉmo",
+  "description": "Partage ton état émotionnel avec l'autre, simplement.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "social"],
+  "lang": "fr"
+}

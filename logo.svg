@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fond rond -->
+  <rect width="512" height="512" rx="110" fill="#ffffff"/>
+  <!-- Anneau extérieur dégradé -->
+  <defs>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#e05555"/>
+      <stop offset="50%"  stop-color="#e0a530"/>
+      <stop offset="100%" stop-color="#3a90c8"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="url(#ring)" stroke-width="44" stroke-linecap="round"
+    stroke-dasharray="880" stroke-dashoffset="220"
+    transform="rotate(-90 256 256)"/>
+  <!-- Visage -->
+  <circle cx="256" cy="256" r="120" fill="#f9f7f4"/>
+  <!-- Yeux -->
+  <circle cx="210" cy="228" r="18" fill="#1a1a1a"/>
+  <circle cx="302" cy="228" r="18" fill="#1a1a1a"/>
+  <!-- Sourire -->
+  <path d="M188,290 Q256,340 324,290" fill="none" stroke="#1a1a1a" stroke-width="14" stroke-linecap="round"/>
+</svg>

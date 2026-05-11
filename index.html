@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#ffffff"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="MétéoÉmo"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="logo.svg"/>
+<title>Météo Émotionnelle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root {
+  --white:#ffffff; --bg:#f8f6f3; --text:#111111; --muted:#999;
+  --border:#e5e0d8;
+  --c1:#e05555;--c2:#e07a30;--c3:#e0a530;--c4:#c9c030;--c5:#a0c030;
+  --c6:#70ba50;--c7:#50b870;--c8:#3ab890;--c9:#3aaab0;--c10:#3a90c8;
+  --cur:#70ba50;
+  --r:14px;
+  font-family:'Atkinson Hyperlegible',sans-serif;
+  color:var(--text);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;background:var(--white);}
+
+/* SHELL */
+#app{
+  width:100%;max-width:430px;height:100dvh;
+  margin:0 auto;display:flex;flex-direction:column;
+  background:var(--white);
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+
+/* TABS */
+.tabs{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  border-bottom:1.5px solid var(--border);flex-shrink:0;
+}
+.tab{
+  padding:10px 4px 8px;border:none;background:none;
+  font-family:inherit;font-size:.7rem;font-weight:700;
+  color:var(--muted);letter-spacing:.06em;text-transform:uppercase;
+  border-bottom:2.5px solid transparent;cursor:pointer;
+  transition:color .15s,border-color .15s;
+}
+.tab.on{color:var(--text);border-bottom-color:var(--cur);}
+
+/* PANELS */
+.panel{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.panel.on{display:flex;}
+
+/* ── PANEL MOI ── */
+#pMine{padding:8px 14px 10px;gap:8px;}
+
+/* Molette */
+.wheel-wrap{display:flex;flex-direction:column;align-items:center;gap:0;flex-shrink:0;}
+.wheel-outer{
+  position:relative;width:186px;height:186px;
+  cursor:grab;touch-action:none;
+}
+.wheel-outer:active{cursor:grabbing;}
+#wSvg{width:100%;height:100%;transform:rotate(-90deg);}
+.wTrack{fill:none;stroke:var(--border);stroke-width:22;stroke-linecap:round;}
+.wProg{fill:none;stroke-width:22;stroke-linecap:round;transition:stroke-dashoffset .2s,stroke .2s;}
+.wheel-center{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;pointer-events:none;
+}
+.smiley{width:58px;height:58px;}
+.wLabel{font-size:.66rem;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;}
+.cdot{
+  width:9px;height:9px;border-radius:50%;background:#e05555;
+  position:absolute;top:16px;right:16px;
+  box-shadow:0 0 0 3px rgba(224,85,85,.22);display:none;
+}
+.cdot.on{display:block;}
+.wheel-hint{
+  display:flex;justify-content:space-between;width:186px;
+  padding:0 4px;margin-top:4px;
+}
+.wheel-hint span{font-size:.62rem;color:var(--muted);font-weight:700;}
+
+/* Cycle row */
+.row-cycle{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg);border-radius:11px;padding:9px 13px;flex-shrink:0;
+}
+.row-cycle-l{font-size:.8rem;font-weight:700;}
+.row-cycle-s{font-size:.65rem;color:var(--muted);}
+.toggle{position:relative;width:42px;height:24px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.tslide{
+  position:absolute;inset:0;background:var(--border);
+  border-radius:24px;cursor:pointer;transition:background .2s;
+}
+.tslide::after{
+  content:'';position:absolute;left:3px;top:3px;
+  width:18px;height:18px;border-radius:50%;background:var(--white);
+  transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);
+}
+.toggle input:checked+.tslide{background:#e05555;}
+.toggle input:checked+.tslide::after{transform:translateX(18px);}
+
+/* Besoins */
+.sec-label{font-size:.62rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);}
+.needs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.need{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;padding:8px 4px;
+  border:1.5px solid var(--border);border-radius:11px;
+  background:var(--white);cursor:pointer;
+  font-family:inherit;font-size:.62rem;font-weight:700;color:var(--text);
+  text-align:center;line-height:1.2;
+  transition:border-color .12s,background .12s,transform .08s;
+  min-height:64px;
+}
+.need .ni{font-size:1.3rem;line-height:1;}
+.need:active{transform:scale(.93);}
+.need.on{border-color:var(--text);background:var(--text);color:var(--white);}
+
+/* Save */
+.save-wrap{display:flex;flex-direction:column;gap:4px;align-items:center;flex-shrink:0;}
+.btn-save{
+  width:100%;padding:11px;border:none;border-radius:11px;
+  background:var(--text);color:var(--white);
+  font-family:inherit;font-size:.88rem;font-weight:700;
+  cursor:pointer;transition:opacity .15s,transform .08s;letter-spacing:.02em;
+}
+.btn-save:hover{opacity:.82;}
+.btn-save:active{transform:scale(.97);}
+.btn-save:disabled{opacity:.35;cursor:default;}
+.upd-lbl{font-size:.64rem;color:var(--muted);}
+
+/* ── PANEL IEL ── */
+#pOther{padding:10px 14px 10px;gap:10px;}
+.other-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.other-header .sec-label{margin:0;}
+.btn-ref{
+  font-family:inherit;font-size:.68rem;font-weight:700;
+  color:var(--cur);background:none;border:1.5px solid var(--cur);
+  border-radius:7px;padding:5px 10px;cursor:pointer;
+  transition:background .12s,color .12s;
+}
+.btn-ref:hover{background:var(--cur);color:var(--white);}
+.other-card{
+  background:var(--bg);border-radius:var(--r);
+  padding:14px;display:flex;flex-direction:column;gap:12px;flex-shrink:0;
+}
+.other-top{display:flex;align-items:center;gap:12px;}
+.osmiley-wrap{position:relative;flex-shrink:0;}
+.osmiley-bg{
+  width:66px;height:66px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;transition:background .3s;
+}
+.osmiley-bg svg{width:66px;height:66px;}
+.ocdot{
+  width:10px;height:10px;border-radius:50%;background:#e05555;
+  border:2px solid var(--white);position:absolute;top:0;right:0;display:none;
+}
+.ocdot.on{display:block;}
+.ostat{font-size:.95rem;font-weight:700;}
+.olvl{font-size:.72rem;color:var(--muted);margin-top:1px;}
+.oupd{font-size:.65rem;color:var(--muted);margin-top:4px;}
+.oneed{
+  display:flex;align-items:center;gap:11px;
+  background:var(--white);border-radius:10px;padding:11px 13px;
+}
+.oneed-icon{font-size:1.7rem;line-height:1;}
+.oneed-name{font-size:.85rem;font-weight:700;}
+.oneed-desc{font-size:.68rem;color:var(--muted);margin-top:1px;}
+.no-data{text-align:center;color:var(--muted);font-size:.82rem;padding:20px 0;}
+
+/* ── PANEL CONFIG ── */
+#pCfg{padding:14px;gap:12px;overflow-y:auto;}
+.cfg-card{background:var(--bg);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:11px;}
+.cfg-card label{font-size:.8rem;font-weight:700;}
+.cfg-card input,.cfg-card select{
+  width:100%;padding:10px 12px;
+  border:1.5px solid var(--border);border-radius:8px;
+  font-family:inherit;font-size:.88rem;background:var(--white);color:var(--text);
+  outline:none;transition:border-color .15s;
+}
+.cfg-card input:focus,.cfg-card select:focus{border-color:var(--cur);}
+.btn-cfg{
+  padding:11px;border:none;border-radius:9px;
+  background:var(--text);color:var(--white);
+  font-family:inherit;font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .15s;
+}
+.btn-cfg:hover{opacity:.82;}
+.badge{font-size:.75rem;padding:7px 11px;border-radius:7px;text-align:center;font-weight:700;}
+.badge.ok{background:#e8f7ee;color:#2a8a50;}
+.badge.err{background:#fdecea;color:#c0392b;}
+.badge.info{background:#edf3fb;color:#2a6aad;}
+.cfg-help{font-size:.72rem;color:var(--muted);line-height:1.5;}
+
+/* SPINNER */
+.spin{
+  display:inline-block;width:15px;height:15px;
+  border:2.5px solid var(--border);border-top-color:var(--cur);
+  border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle;
+}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* TOAST */
+#toast{
+  position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));
+  left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--text);color:var(--white);
+  padding:9px 18px;border-radius:50px;
+  font-size:.8rem;font-weight:700;
+  opacity:0;transition:opacity .22s,transform .22s;
+  pointer-events:none;z-index:999;white-space:nowrap;
+}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <nav class="tabs">
+    <button class="tab on" data-t="Mine">Moi</button>
+    <button class="tab"    data-t="Other">Iel</button>
+    <button class="tab"    data-t="Cfg">⚙ Réglages</button>
+  </nav>
+
+  <!-- MOI -->
+  <div id="pMine" class="panel on">
+    <div class="wheel-wrap">
+      <div class="wheel-outer" id="wO">
+        <svg id="wSvg" viewBox="0 0 200 200">
+          <circle class="wTrack" cx="100" cy="100" r="76"/>
+          <circle class="wProg" id="wP" cx="100" cy="100" r="76"
+            stroke-dasharray="478" stroke-dashoffset="239" stroke="#70ba50"/>
+        </svg>
+        <div class="wheel-center">
+          <svg class="smiley" viewBox="0 0 72 72">
+            <circle id="sBg" cx="36" cy="36" r="34" fill="#f0f0f0"/>
+            <circle id="eL" cx="24" cy="30" r="4" fill="#111"/>
+            <circle id="eR" cx="48" cy="30" r="4" fill="#111"/>
+            <path id="mouth" d="M22,44 Q36,52 50,44" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+          <div class="cdot" id="cDot"></div>
+          <span class="wLabel" id="wLbl">Équilibré·e</span>
+        </div>
+      </div>
+      <div class="wheel-hint"><span>🔥 Cramé·e</span><span>🌱 Open</span></div>
+    </div>
+
+    <div class="row-cycle">
+      <div>
+        <div class="row-cycle-l">🔴 Facteur cycle</div>
+        <div class="row-cycle-s">Influe aujourd'hui ?</div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="cycleT"><span class="tslide"></span></label>
+    </div>
+
+    <div class="sec-label">Ce dont j'ai besoin</div>
+    <div class="needs" id="needsG"></div>
+
+    <div class="save-wrap">
+      <button class="btn-save" id="btnSave">Enregistrer mon état</button>
+      <span class="upd-lbl" id="myUpd"></span>
+    </div>
+  </div>
+
+  <!-- IEL -->
+  <div id="pOther" class="panel">
+    <div class="other-header">
+      <div class="sec-label">État de l'autre</div>
+      <button class="btn-ref" id="btnRef">↻ Actualiser</button>
+    </div>
+    <div id="otherC"><p class="no-data">Configure la relation dans ⚙</p></div>
+  </div>
+
+  <!-- CONFIG -->
+  <div id="pCfg" class="panel">
+    <div class="cfg-card">
+      <div class="sec-label" style="margin-bottom:0">Relation</div>
+      <label for="relK">Clé partagée (même pour vous deux)</label>
+      <input type="text" id="relK" placeholder="ex: COUPLE2024" autocomplete="off" spellcheck="false"/>
+      <label for="myR">Mon rôle</label>
+      <select id="myR">
+        <option value="pA">Personne A</option>
+        <option value="pB">Personne B</option>
+      </select>
+      <button class="btn-cfg" id="btnConn">Se connecter</button>
+      <div class="badge info" id="connBadge">Non configuré</div>
+    </div>
+    <div class="cfg-card">
+      <p class="cfg-help">
+        <strong>Comment ça marche :</strong><br>
+        Toi et l'autre personne entrez la <strong>même clé</strong>,
+        mais chacun·e choisit un rôle différent (A ou B).
+        L'état se synchronise automatiquement toutes les 30 secondes.
+      </p>
+    </div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   🔧  CONFIGURATION — modifier avant de déployer
+═══════════════════════════════════════════════════════════ */
+const SB_URL = 'https://VOTRE_PROJET.supabase.co';   // ← remplacer
+const SB_KEY = 'VOTRE_CLE_ANON_PUBLIQUE';            // ← remplacer
+
+/* ═══════════════════════════════════════════════════════════
+   DONNÉES
+═══════════════════════════════════════════════════════════ */
+const NEEDS=[
+  {id:'cocoon',   icon:'🏠',label:'Dans ma bulle', desc:'Cocooning time'},
+  {id:'filmchill',icon:'🎬',label:'Film & chill',  desc:'Avec toi'},
+  {id:'sortie',   icon:'🎉',label:'Grosse sortie', desc:'On s\'éclate'},
+  {id:'nature',   icon:'🌿',label:'Rando/picnic',  desc:'Dehors & frais'},
+  {id:'ecoute',   icon:'👂',label:'Écoute active', desc:'Débriefer'},
+  {id:'silence',  icon:'🕯️',label:'Silence partagé',desc:'Chacun son truc'},
+];
+const LVLS=['','Cramé·e','Épuisé·e','Fatigué·e','Tendu·e','Neutre','Équilibré·e','Bien','En forme','Joyeux·se','Open !'];
+const COLS=['','#e05555','#e07a30','#e0a530','#c9c030','#a0c030','#70ba50','#50b870','#3ab890','#3aaab0','#3a90c8'];
+
+let sb=null,relKey='',myRole='pA',otherRole='pB';
+let myS={level:5,need:null,cycle:false};
+let polling=null;
+const CIRC=2*Math.PI*76;
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
+function initSB(){
+  if(SB_URL.includes('VOTRE_PROJET'))return;
+  try{sb=supabase.createClient(SB_URL,SB_KEY);}catch(e){sb=null;}
+}
+initSB();
+
+/* ═══════════════════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════════════════ */
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById('p'+b.dataset.t).classList.add('on');
+    if(b.dataset.t==='Other')fetchOther();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════
+   MOLETTE
+═══════════════════════════════════════════════════════════ */
+const wO=document.getElementById('wO'),wP=document.getElementById('wP');
+function offs(lv){return CIRC*(1-(lv-1)/9);}
+function wheelUI(lv){
+  wP.style.strokeDashoffset=offs(lv);
+  wP.style.stroke=COLS[lv];
+  document.getElementById('wLbl').textContent=LVLS[lv];
+  document.getElementById('sBg').setAttribute('fill',COLS[lv]+'22');
+  const cy=44+(lv-5.5)*2.8;
+  document.getElementById('mouth').setAttribute('d',`M22,44 Q36,${cy} 50,44`);
+  const r=lv<=2?2:4;
+  document.getElementById('eL').setAttribute('r',r);
+  document.getElementById('eR').setAttribute('r',r);
+  document.documentElement.style.setProperty('--cur',COLS[lv]);
+}
+let drag=false,startA=null,startLv=null;
+function ang(e,rect){
+  const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+  const x=(e.touches?e.touches[0].clientX:e.clientX)-cx;
+  const y=(e.touches?e.touches[0].clientY:e.clientY)-cy;
+  return Math.atan2(y,x)*180/Math.PI;
+}
+wO.addEventListener('mousedown',e=>{drag=true;startA=ang(e,wO.getBoundingClientRect());startLv=myS.level;e.preventDefault();});
+wO.addEventListener('touchstart',e=>{drag=true;startA=ang(e,wO.getBoundingClientRect());startLv=myS.level;e.preventDefault();},{passive:false});
+window.addEventListener('mousemove',e=>{
+  if(!drag)return;
+  let d=ang(e,wO.getBoundingClientRect())-startA;
+  if(d>180)d-=360;if(d<-180)d+=360;
+  const nl=Math.min(10,Math.max(1,startLv+Math.round(d/18)));
+  if(nl!==myS.level){myS.level=nl;wheelUI(nl);}
+});
+window.addEventListener('touchmove',e=>{
+  if(!drag)return;
+  let d=ang(e,wO.getBoundingClientRect())-startA;
+  if(d>180)d-=360;if(d<-180)d+=360;
+  const nl=Math.min(10,Math.max(1,startLv+Math.round(d/18)));
+  if(nl!==myS.level){myS.level=nl;wheelUI(nl);}
+},{passive:false});
+window.addEventListener('mouseup',()=>drag=false);
+window.addEventListener('touchend',()=>drag=false);
+wO.addEventListener('wheel',e=>{
+  e.preventDefault();
+  myS.level=Math.min(10,Math.max(1,myS.level+(e.deltaY>0?-1:1)));
+  wheelUI(myS.level);
+},{passive:false});
+
+/* ═══════════════════════════════════════════════════════════
+   CYCLE
+═══════════════════════════════════════════════════════════ */
+document.getElementById('cycleT').addEventListener('change',function(){
+  myS.cycle=this.checked;
+  document.getElementById('cDot').classList.toggle('on',this.checked);
+});
+
+/* ═══════════════════════════════════════════════════════════
+   BESOINS
+═══════════════════════════════════════════════════════════ */
+const ng=document.getElementById('needsG');
+NEEDS.forEach(n=>{
+  const b=document.createElement('button');
+  b.className='need';b.dataset.id=n.id;
+  b.innerHTML=`<span class="ni">${n.icon}</span><span>${n.label}</span>`;
+  b.addEventListener('click',()=>{
+    if(myS.need===n.id){myS.need=null;b.classList.remove('on');}
+    else{ng.querySelectorAll('.need').forEach(x=>x.classList.remove('on'));myS.need=n.id;b.classList.add('on');}
+  });
+  ng.appendChild(b);
+});
+
+/* ═══════════════════════════════════════════════════════════
+   CONNECT
+═══════════════════════════════════════════════════════════ */
+function loadLocal(){
+  const rk=localStorage.getItem('me_rel')||'';
+  const mr=localStorage.getItem('me_role')||'pA';
+  document.getElementById('relK').value=rk;
+  document.getElementById('myR').value=mr;
+  if(rk){relKey=rk;myRole=mr;otherRole=mr==='pA'?'pB':'pA';}
+}
+function setBadge(msg,type){const e=document.getElementById('connBadge');e.textContent=msg;e.className='badge '+type;}
+
+document.getElementById('btnConn').addEventListener('click',async()=>{
+  const rk=document.getElementById('relK').value.trim().toUpperCase();
+  const mr=document.getElementById('myR').value;
+  if(!rk){setBadge('Entre une clé de relation','err');return;}
+  if(!sb){setBadge('URL/clé Supabase non configurées dans le code','err');return;}
+  relKey=rk;myRole=mr;otherRole=mr==='pA'?'pB':'pA';
+  localStorage.setItem('me_rel',rk);localStorage.setItem('me_role',mr);
+  setBadge('Connexion…','info');
+  try{
+    const {data,error}=await sb.from('relations').select('*').eq('relation_key',relKey).maybeSingle();
+    if(error)throw error;
+    if(!data){const {error:ie}=await sb.from('relations').insert([{relation_key:relKey}]);if(ie)throw ie;}
+    else{
+      const lv=data[`${myRole}_status_level`]||5;
+      const nd=data[`${myRole}_need_id`]||null;
+      const cy=data[`${myRole}_cycle_alert`]||false;
+      myS={level:lv,need:nd,cycle:cy};
+      wheelUI(lv);
+      document.getElementById('cycleT').checked=cy;
+      document.getElementById('cDot').classList.toggle('on',cy);
+      ng.querySelectorAll('.need').forEach(b=>b.classList.toggle('on',b.dataset.id===nd));
+      const lu=data[`${myRole}_last_update`];
+      if(lu)document.getElementById('myUpd').textContent='Mis à jour : '+relTime(lu);
+    }
+    setBadge(`✓ Connecté·e — ${relKey}`,'ok');
+    startPoll();toast('Connecté·e !');
+  }catch(e){setBadge('Erreur : '+(e.message||e),'err');}
+});
+
+/* ═══════════════════════════════════════════════════════════
+   SAVE
+═══════════════════════════════════════════════════════════ */
+document.getElementById('btnSave').addEventListener('click',async()=>{
+  if(!sb||!relKey){toast('Configure la relation dans ⚙');return;}
+  const btn=document.getElementById('btnSave');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
+  const u={};
+  u[`${myRole}_status_level`]=myS.level;
+  u[`${myRole}_need_id`]=myS.need||'none';
+  u[`${myRole}_cycle_alert`]=myS.cycle;
+  try{
+    const {error}=await sb.from('relations').update(u).eq('relation_key',relKey);
+    if(error)throw error;
+    document.getElementById('myUpd').textContent='Mis à jour : '+relTime(new Date().toISOString());
+    toast('État enregistré ✓');
+  }catch(e){toast('Erreur : '+(e.message||e));}
+  finally{btn.disabled=false;btn.textContent='Enregistrer mon état';}
+});
+
+/* ═══════════════════════════════════════════════════════════
+   FETCH OTHER
+═══════════════════════════════════════════════════════════ */
+async function fetchOther(){
+  if(!sb||!relKey){document.getElementById('otherC').innerHTML='<p class="no-data">Configure la relation dans ⚙</p>';return;}
+  document.getElementById('otherC').innerHTML='<p class="no-data"><span class="spin"></span></p>';
+  try{
+    const {data,error}=await sb.from('relations').select('*').eq('relation_key',relKey).maybeSingle();
+    if(error)throw error;
+    if(!data){document.getElementById('otherC').innerHTML='<p class="no-data">Aucune donnée.</p>';return;}
+    renderOther(data);
+  }catch(e){document.getElementById('otherC').innerHTML=`<p class="no-data">Erreur : ${e.message}</p>`;}
+}
+function buildSmiley(lv,sz){
+  const col=COLS[lv],cy2=44+(lv-5.5)*2.8,r=lv<=2?2:4;
+  return `<svg viewBox="0 0 72 72" width="${sz}" height="${sz}">
+    <circle cx="36" cy="36" r="34" fill="${col}33"/>
+    <circle cx="24" cy="30" r="${r}" fill="#111"/>
+    <circle cx="48" cy="30" r="${r}" fill="#111"/>
+    <path d="M22,44 Q36,${cy2} 50,44" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+  </svg>`;
+}
+function renderOther(d){
+  const lv=d[`${otherRole}_status_level`]||5;
+  const nd=d[`${otherRole}_need_id`]||'none';
+  const cy=d[`${otherRole}_cycle_alert`]||false;
+  const lu=d[`${otherRole}_last_update`];
+  const col=COLS[lv],need=NEEDS.find(n=>n.id===nd),stale=lu?staleStr(lu):'';
+  document.getElementById('otherC').innerHTML=`
+  <div class="other-card">
+    <div class="other-top">
+      <div class="osmiley-wrap">
+        <div class="osmiley-bg" style="background:${col}22">${buildSmiley(lv,66)}</div>
+        ${cy?'<div class="ocdot on"></div>':''}
+      </div>
+      <div class="oinfo">
+        <div class="ostat">${LVLS[lv]}</div>
+        <div class="olvl">Niveau ${lv}/10${cy?' · <span style="color:#e05555">🔴 Cycle</span>':''}</div>
+        <div class="oupd">Mis à jour : ${lu?relTime(lu):'jamais'}${stale?' · <strong>'+stale+'</strong>':''}</div>
+      </div>
+    </div>
+    <div class="oneed">
+      <span class="oneed-icon">${need?need.icon:'💭'}</span>
+      <div>
+        <div class="oneed-name">${need?need.label:'Rien d\'exprimé'}</div>
+        <div class="oneed-desc">${need?need.desc:''}</div>
+      </div>
+    </div>
+  </div>`;
+}
+document.getElementById('btnRef').addEventListener('click',fetchOther);
+
+/* ═══════════════════════════════════════════════════════════
+   POLLING
+═══════════════════════════════════════════════════════════ */
+function startPoll(){
+  if(polling)clearInterval(polling);
+  polling=setInterval(()=>{
+    if(document.getElementById('pOther').classList.contains('on'))fetchOther();
+  },30000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════ */
+function relTime(iso){
+  const d=Math.round((Date.now()-new Date(iso))/60000);
+  if(d<1)return 'à l\'instant';if(d<60)return `il y a ${d} min`;
+  const h=Math.floor(d/60);if(h<24)return `il y a ${h}h`;
+  return new Date(iso).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function staleStr(iso){
+  const d=Math.round((Date.now()-new Date(iso))/60000);
+  if(d>1440)return '⚠ Très ancienne';if(d>240)return '⚠ Ancienne';return '';
+}
+function toast(msg){
+  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');
+  setTimeout(()=>el.classList.remove('on'),2600);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SERVICE WORKER
+═══════════════════════════════════════════════════════════ */
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+/* ═══════════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════════ */
+loadLocal();
+wheelUI(5);
+if(relKey&&sb)document.getElementById('btnConn').click();
+</script>
+</body>
+</html>
